@@ -1,0 +1,10 @@
+# Dashboard theme: pitch green on a cool off-white, one fixed light look.
+[theme]
+base = "light"
+primaryColor = "#1d6b4c"
+backgroundColor = "#f6f7f4"
+secondaryBackgroundColor = "#eceee8"
+textColor = "#15201a"
+
+[browser]
+gatherUsageStats = false

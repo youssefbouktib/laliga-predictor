@@ -122,8 +122,15 @@ def cmd_evaluate(args):
     print("\nControl, no model (bet every outcome): average fair CLV "
           + ", ".join(f"{p} price {v:+.2%}" for p, v in control.items()))
 
-    strategy = backtest.settle(backtest.find_value(preds[main], 0.05, price, max_edge))
+    strategy_value = backtest.find_value(preds[main], 0.05, price, max_edge)
+    strategy = backtest.settle(strategy_value)
     by_season = backtest.by_season(strategy)
+    # bet-by-bet record of the main strategy, for the dashboard's charts
+    kelly_bank = backtest.settle_kelly(strategy_value)["bankroll"]
+    bet_cols = ["date", "season", "home", "away", "result", "pick", "p_model", "bet_odds", "ev",
+                "clv_fair", "profit", "cum_profit"]
+    strategy[bet_cols].assign(kelly_bankroll=kelly_bank.reindex(strategy.index), model=main,
+                              price=price).to_csv(REPORTS / "strategy_bets.csv", index=False)
     print(f"\nMain strategy by season ({main}, {price} price, {_edge_range(0.05, max_edge)}, flat):")
     print(by_season.round(3).to_string(index=False))
 

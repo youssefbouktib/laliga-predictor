@@ -73,7 +73,7 @@ def test_app_full_reports(tmp_path, full_reports):
     _app(tmp_path, full_reports)
     at = _run(tmp_path / "app.py")
     assert not at.exception
-    assert len(at.tabs) == 4
+    assert len(at.tabs) == 5
     labels = {m.label: m.value for m in at.metric}
     assert labels["Bets logged"] == str(len(pd.read_csv(full_reports / "paper_trades.csv")))
     assert labels["Best model"] in {"logistic", "dixon_coles"}
