@@ -33,8 +33,11 @@ def write_fixtures(raw_dir, rounds=(ROUND_PLAYED, ROUND_NEXT), shift=0):
     synth.write_csv(pd.concat(frames, ignore_index=True), raw_dir / "fixtures.csv", bom=True)
 
 
-def predict(model="dixon_coles", min_edge=0.05):
-    run.cmd_predict(argparse.Namespace(model=model, min_edge=min_edge))
+def predict(model="dixon_coles", min_edge=0.05, price="book", max_edge=None):
+    # book price and no edge cap by default: the synthetic fixture odds are 15%
+    # generous on purpose, so every game should be a value bet
+    run.cmd_predict(argparse.Namespace(model=model, min_edge=min_edge, price=price,
+                                       max_edge=max_edge))
 
 
 def test_evaluate_writes_reports(env):
@@ -56,7 +59,12 @@ def test_evaluate_writes_reports(env):
     assert set(metrics.season) == {"2022/23", "2023/24"}
     bt = pd.read_csv(rep / "backtest_summary.csv")
     main = comp.model.iloc[0]
-    assert len(bt[bt.model == main]) == 2 * len(run.EDGES)
+    # main model: 2 prices x 2 stakings x every edge
+    assert len(bt[bt.model == main]) == 2 * 2 * len(run.EDGES)
+    assert set(bt.price) == {"book", "best"}
+    assert {"roi_ci_low", "roi_ci_high", "avg_clv_fair"} <= set(bt.columns)
+    for f in ["strategy_by_season.csv", "control_clv.csv", "clv_by_season.png"]:
+        assert (rep / f).exists(), f
 
 
 def test_evaluate_model_not_in_models_list(env):
@@ -79,8 +87,9 @@ def test_predict_excludes_played_fixtures_and_logs_once(env):
     np.testing.assert_allclose(up[["p_h", "p_d", "p_a"]].sum(axis=1), 1.0)
     log = pd.read_csv(env / "reports" / run.PAPER_LOG)
     assert len(log) == len(nxt)      # odds are 15% generous -> every game is a value bet
-    assert list(log.columns) == ["logged_at", "model", "date", "home", "away", "book", "pick",
-                                 "p_model", "bet_odds", "ev"]
+    assert list(log.columns) == ["logged_at", "model", "date", "home", "away", "book", "price",
+                                 "pick", "p_model", "bet_odds", "ev"]
+    assert (log.price == "book").all()
     assert (log.ev > 0.05).all()
     # rerun: nothing new is logged
     predict()

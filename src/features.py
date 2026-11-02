@@ -19,7 +19,10 @@ FEATURES = [
     "away_gf5", "away_ga5", "away_pts5",
 ]
 XG_FEATURES = ["home_xgf", "home_xga", "away_xgf", "away_xga"]
-SNAPSHOT_COLS = ["elo_home", "elo_away"] + FEATURES + XG_FEATURES
+# rolling shots / shots on target for and against: a free xG substitute
+SHOT_FEATURES = ["home_shf", "home_sha", "home_sotf", "home_sota",
+                 "away_shf", "away_sha", "away_sotf", "away_sota"]
+SNAPSHOT_COLS = ["elo_home", "elo_away"] + FEATURES + XG_FEATURES + SHOT_FEATURES
 
 
 @dataclass
@@ -32,6 +35,9 @@ class EloConfig:
     form_window: int = 5
     xg_window: int = 8              # xG is noisy per match, so average more games
     xg_default: float = 1.25        # league-average xG per team per match
+    shot_window: int = 8
+    shots_default: float = 12.0     # league-average shots per team per match
+    sot_default: float = 4.2        # league-average shots on target
 
 
 @dataclass
@@ -39,6 +45,7 @@ class TeamState:
     ratings: dict = field(default_factory=dict)
     form: dict = field(default_factory=dict)
     xg: dict = field(default_factory=dict)
+    shots: dict = field(default_factory=dict)
     season: int | None = None        # season of the last match seen
     first_season: int | None = None  # warm-up season: nobody counts as promoted
     prev_teams: set = field(default_factory=set)  # teams in last season's league
@@ -66,10 +73,19 @@ def _xg_feats(hist: deque, default: float) -> tuple[float, float]:
     return sum(h[0] for h in hist) / n, sum(h[1] for h in hist) / n
 
 
+def _shot_feats(hist: deque, cfg: "EloConfig") -> tuple[float, float, float, float]:
+    """Average (shots for, shots against, on target for, on target against)."""
+    if not hist:
+        return cfg.shots_default, cfg.shots_default, cfg.sot_default, cfg.sot_default
+    n = len(hist)
+    return tuple(sum(float(h[i]) for h in hist) / n for i in range(4))
+
+
 def new_state(cfg: EloConfig) -> TeamState:
     st = TeamState()
     st.form = defaultdict(lambda: deque(maxlen=cfg.form_window))
     st.xg = defaultdict(lambda: deque(maxlen=cfg.xg_window))
+    st.shots = defaultdict(lambda: deque(maxlen=cfg.shot_window))
     return st
 
 
@@ -103,6 +119,7 @@ def _first_game(st: TeamState, team: str, cfg: EloConfig) -> None:
         st.ratings[team] = cfg.promoted_init
         st.form[team].clear()
         st.xg[team].clear()
+        st.shots[team].clear()
 
 
 def build_features(df: pd.DataFrame, cfg: EloConfig | None = None):
@@ -115,6 +132,10 @@ def build_features(df: pd.DataFrame, cfg: EloConfig | None = None):
     cfg = cfg or EloConfig()
     st = new_state(cfg)
     has_xg = {"hxg", "axg"}.issubset(df.columns)
+    shot_cols = ["h_shots", "a_shots", "h_sot", "a_sot"]
+    # clean() always creates these columns (NaN when the source has none), so
+    # require real values, not just the columns
+    has_shots = set(shot_cols).issubset(df.columns) and df[shot_cols].notna().any().all()
     rows = []
 
     for m in df.itertuples(index=False):
@@ -128,12 +149,17 @@ def build_features(df: pd.DataFrame, cfg: EloConfig | None = None):
         if has_xg and not (pd.isna(m.hxg) or pd.isna(m.axg)):
             st.xg[m.home].append((float(m.hxg), float(m.axg)))
             st.xg[m.away].append((float(m.axg), float(m.hxg)))
+        if has_shots and not any(pd.isna(v) for v in (m.h_shots, m.a_shots, m.h_sot, m.a_sot)):
+            st.shots[m.home].append((m.h_shots, m.a_shots, m.h_sot, m.a_sot))
+            st.shots[m.away].append((m.a_shots, m.h_shots, m.a_sot, m.h_sot))
 
     # columns= keeps an empty input working (no rows -> no keys to infer from)
     feats = pd.DataFrame(rows, index=df.index, columns=SNAPSHOT_COLS)
     out = pd.concat([df, feats], axis=1)
     if not has_xg:
         out = out.drop(columns=XG_FEATURES)
+    if not has_shots:
+        out = out.drop(columns=SHOT_FEATURES)
     return out, st
 
 
@@ -144,12 +170,15 @@ def snapshot(st: TeamState, home: str, away: str, cfg: EloConfig) -> dict:
     agf, aga, apts = _form_feats(st.form[away])
     hxf, hxa = _xg_feats(st.xg[home], cfg.xg_default)
     axf, axa = _xg_feats(st.xg[away], cfg.xg_default)
+    hs, as_ = _shot_feats(st.shots[home], cfg), _shot_feats(st.shots[away], cfg)
     return {
         "elo_home": rh, "elo_away": ra,
         "elo_diff": rh + cfg.home_adv - ra,
         "home_gf5": hgf, "home_ga5": hga, "home_pts5": hpts,
         "away_gf5": agf, "away_ga5": aga, "away_pts5": apts,
         "home_xgf": hxf, "home_xga": hxa, "away_xgf": axf, "away_xga": axa,
+        "home_shf": hs[0], "home_sha": hs[1], "home_sotf": hs[2], "home_sota": hs[3],
+        "away_shf": as_[0], "away_sha": as_[1], "away_sotf": as_[2], "away_sota": as_[3],
     }
 
 

@@ -1,60 +1,113 @@
 # La Liga Match Predictor
 
-Can a data science model beat the betting market on Spanish football?
+Can a data science model find mispriced odds in Spanish football?
 
-This project predicts La Liga results (home / draw / away) with three models,
-tests them the way they would really be used (walk-forward, no peeking at the
-future), and compares them with the **bookmaker's closing odds**, the hardest
-benchmark in sports forecasting. It then paper-trades the model's "value bets"
-to see whether any edge survives contact with real prices.
+This project forecasts La Liga results (home / draw / away) with nine models,
+tests them the way they would really be used (walk-forward, never peeking at
+the future), and measures them against the **sharp closing odds**, the hardest
+benchmark in sports forecasting. It then looks for value bets and judges them
+by **closing line value**: did the bet get a better price than the market's
+final, best-informed opinion?
 
-**Short answer so far: no.** The best model is about 0.02 log loss behind the
-market. This README shows how that was measured and why it matters.
+**Results in one paragraph.** No model forecasts results better than the
+closing line. But a model that starts from the sharp *opening* odds and adds
+Dixon-Coles and Elo signals, combined with line shopping, picks bets that beat
+the sharp closing line by **+2.3% on average (68% of bets)**. Picking at random
+at the same prices gives **−0.8%**. The edge holds in four of five test seasons
+and fades after Pinnacle odds vanish from the data in 2026. Realised profit is
+still within the range of luck (ROI +0.3%, 95% interval −12% to +13% over
+622 bets), so this is a promising signal, not proven profit.
 
-![Model comparison](docs/img/model_comparison.png)
+![Do the bets beat the closing line?](docs/img/clv_by_season.png)
 
 ## Why not just report accuracy?
 
 The home team wins about 45% of La Liga games and the bookmaker's favourite
-wins about 50%, so "52% accuracy" says nothing. What matters for betting is
-whether the model's **probabilities** are better than the market's. The project
-therefore judges every model by:
+about 50%, so "52% accuracy" says nothing. For betting, what matters is:
 
-- **Log loss** and **Brier score** against the margin-free closing odds
-  (Pinnacle, or the Betfair Exchange once Pinnacle odds stop in Jan 2026).
-- **Closing line value (CLV)** of its bets: did we get a better price than the
-  final market price at the same bookmaker? Over hundreds of bets, CLV is a much
-  less noisy signal of a real edge than profit.
+1. **Probability quality**: log loss and Brier score against the
+   margin-free sharp closing odds (Pinnacle, or the Betfair Exchange once
+   Pinnacle odds stop in January 2026).
+2. **Closing line value (CLV)**: `bet odds × fair closing probability − 1`.
+   A bettor whose bets consistently beat the sharp closing line has an edge;
+   one who doesn't is getting lucky or unlucky. Over a few hundred bets CLV is
+   far less noisy than profit.
 
 ## Results (walk-forward, 2022/23 to 2026/27, 1,628 matches)
 
-| Model | Log loss | Brier | Gap to market (log loss) |
+### 1. Forecast quality
+
+| Model | Uses market odds | Log loss | Gap to closing line |
 |---|---|---|---|
-| Bookmaker closing odds | **0.9556** | **0.5668** | – |
-| Dixon-Coles (Poisson, time-decayed) | 0.9762 | 0.5800 | +0.0205 |
-| Logistic regression (Elo + form) | 0.9774 | 0.5798 | +0.0218 |
-| LightGBM (Elo + form) | 0.9841 | 0.5843 | +0.0284 |
+| **Sharp closing odds (benchmark)** | – | **0.9556** | – |
+| `market`: opening odds, recalibrated | yes | 0.9575 | +0.0019 |
+| `market_plus`: opening odds + Dixon-Coles + Elo | yes | 0.9576 | +0.0020 |
+| `ensemble`: Dixon-Coles + Elo + shots, stacked | no | 0.9727 | +0.0171 |
+| `logistic_shots`: Elo, form, rolling shots | no | 0.9758 | +0.0202 |
+| `dixon_coles`: time-decayed Poisson | no | 0.9762 | +0.0205 |
+| `logistic`: Elo + form | no | 0.9774 | +0.0218 |
+| `lgbm_shots` | no | 0.9802 | +0.0245 |
+| `lgbm` | no | 0.9841 | +0.0284 |
 
-Value betting with the best model (Dixon-Coles):
+![Model comparison](docs/img/model_comparison.png)
 
-| Strategy | Bets | Hit rate | ROI | Avg CLV | Beat the close |
-|---|---|---|---|---|---|
-| Flat stakes, edge > 5% | 1,122 | 25.8% | −17.3% | −0.9% | 41% |
-| Quarter Kelly, edge > 5% | 1,122 | 25.8% | −13.0% on turnover; bankroll 100 → 3.9 | −0.9% | 41% |
+- Stacking Dixon-Coles, Elo and shots (`ensemble`) is the best football-only
+  model, 0.0047 better than the plain logistic baseline.
+- The opening market is already almost as good as the close. Football
+  information adds nothing measurable to it on average (0.9575 vs 0.9576), and
+  adding shot statistics to the market made it *worse* (0.9612), so they are
+  left out of `market_plus`.
+- `market_plus` beats the closing line in two seasons (2023/24: 0.9491 vs
+  0.9509; 2025/26: 0.9636 vs 0.9646).
 
-![Profit curves](docs/img/profit_curve.png)
+### 2. Finding value
+
+Value bet: the outcome with the highest expected value, when
+`p_model × odds − 1` is between 5% and 15%. Edges above 15% are skipped: when a
+model disagrees that much with the market, the model is usually wrong.
+
+| Strategy (flat stakes, edge 5–15%) | Bets | ROI (95% interval) | CLV vs sharp close | Bets beating it |
+|---|---|---|---|---|
+| **`market_plus`, best price** | 622 | **+0.3%** (−12% to +13%) | **+2.3%** | **68%** |
+| `market_plus`, one bookmaker | 195 | −15.4% (−35% to +5%) | −2.0% | 26% |
+| `ensemble`, best price | 713 | +0.1% (−10% to +11%) | −1.1% | 45% |
+| `dixon_coles`, one bookmaker | 541 | −12.0% (−25% to +3%) | −4.2% | 29% |
+| No model, every outcome, best price | all | – | −0.8% | – |
+| No model, every outcome, one bookmaker | all | – | −3.8% | – |
+
+| Season | Bets | ROI | CLV vs sharp close | Bets beating it |
+|---|---|---|---|---|
+| 2022/23 | 200 | −3.5% | +2.4% | 71% |
+| 2023/24 | 152 | −3.3% | +2.8% | 74% |
+| 2024/25 | 152 | +10.7% | +3.0% | 72% |
+| 2025/26 | 89 | −9.8% | +1.1% | 52% |
+| 2026/27 (so far) | 29 | +20.7% | −0.1% | 48% |
 
 **What this means**
 
-- No model beats the market in any season. The market already knows
-  everything in Elo and goal-based form, plus injuries, line-ups and the money of
-  professional bettors.
-- The "value bets" are mostly model errors: bigger disagreements with the market
-  lose *more*, and only 41% of bets beat the closing price.
-- Kelly staking amplifies whatever edge you have. With a negative edge it loses
-  the bankroll faster than flat stakes do, which is a useful lesson in itself.
-- The models are still well calibrated (below), so they are reasonable
-  forecasts, just not better than the market's.
+- **The detection signal is real.** The model's bets beat the closing line
+  by 3.1 points more than random bets at the same prices. In 500 simulations
+  of 622 random bets, even the luckiest 2.5% only reached −0.2%.
+- **Line shopping matters as much as the model.** The same model at a single
+  bookmaker is negative: you need its edge *and* the best price.
+- **Profit is not proven.** ROI is within the range of luck. In theory,
+  positive CLV turns into profit over enough bets; paper trading will tell.
+- **Profit without CLV is luck.** `lgbm` at one bookmaker shows +10% ROI in
+  the backtest, but its bets lose 3.9% to the closing line: worse than betting
+  blindly. That profit would not last.
+- **The edge depends on a sharp opening price.** It faded once Pinnacle odds
+  stopped appearing in the data (Jan 2026) and the model fell back to Betfair
+  Exchange and market-average prices.
+- **The best-price column is optimistic.** In 40% of matches the best prices
+  across bookmakers add up to less than 100%, which means some of them are
+  stale or come from bookmakers that limit winning customers. Treat best-price
+  results as an upper bound.
+
+![Profit curves](docs/img/profit_curve.png)
+
+With quarter-Kelly staking the same strategy ends at 98 from a bankroll of
+100 (largest drawdown 24%). The first version of this project, betting
+Dixon-Coles at one bookmaker, ended at 4.
 
 <p>
 <img src="docs/img/calibration.png" width="45%" alt="Calibration plot">
@@ -67,34 +120,42 @@ Value betting with the best model (Dixon-Coles):
 download → clean → features → models → walk-forward test → evaluate → backtest → predict → settle
 ```
 
-1. **Data** (`src/data.py`). Results and odds since 2012/13 from
-   [football-data.co.uk](https://www.football-data.co.uk). For each match, bet
-   odds and closing odds come from the **same** bookmaker (Pinnacle, else
-   Bet365), so CLV is like-for-like. A separate benchmark uses the sharpest
-   closing price available (Pinnacle → Betfair Exchange → market average).
-2. **xG** (`src/xg.py`). Expected goals from [Understat](https://understat.com)
-   (2014/15 on), cached per season and mapped to football-data team names.
-   Optional: if Understat is unreachable, xG models are skipped.
+1. **Data** (`src/data.py`). Results, odds and match statistics since 2012/13
+   from [football-data.co.uk](https://www.football-data.co.uk). For each match:
+   - bet odds and closing odds from the **same** bookmaker (Pinnacle, else
+     Bet365), so like-for-like CLV is possible;
+   - the **best price** across bookmakers (`Max`, `BbMx` before 2019);
+   - **sharp pre-match odds** (Pinnacle → Betfair Exchange → average);
+   - the **benchmark** closing odds (Pinnacle → Betfair Exchange → average);
+   - shots and shots on target.
+2. **xG** (`src/xg.py`). Expected goals from [Understat](https://understat.com),
+   cached and mapped to football-data team names. Optional: Understat was
+   unreachable throughout development, so the xG models switch on
+   automatically once it is back.
 3. **Features** (`src/features.py`), computed in one chronological pass so each
    match only sees the past:
-   - Elo with home advantage, goal-margin weighting, summer regression to the
-     mean, and a lower start for promoted (or returning) teams
+   - Elo with home advantage, goal-margin weighting, summer regression and a
+     lower start for promoted (or returning) teams
    - last-5 form: goals for, goals against, points
-   - rolling xG for and against over the last 8 games (when available)
-4. **Models** (`src/model.py`, `src/dixon_coles.py`)
-   - multinomial logistic regression (baseline)
-   - LightGBM with small, regularised trees
-   - Dixon-Coles: Poisson goals with a low-score correction, exponential time
-     decay (half-life about a year), ridge prior that starts promoted teams below
-     average, exact gradients, refitted every week of the test
-5. **Walk-forward testing**: for each test season, train only on earlier
+   - rolling shots and shots on target, for and against (last 8 games)
+   - rolling xG (when available)
+4. **Model inputs built from other models** (`src/model.py`)
+   - **Dixon-Coles** probabilities for every match, from weekly refits that only
+     see earlier matches, so they can feed other models without leakage.
+   - **Market** probabilities from the sharp pre-match odds, which are
+     published before kickoff.
+5. **Models**: logistic regression, LightGBM, Dixon-Coles (exact gradients,
+   time decay, promoted-team prior), a stacked `ensemble`, and the
+   market-aware `market` / `market_plus`.
+6. **Walk-forward testing**: for each test season, train only on earlier
    seasons. Never a random split.
-6. **Backtest** (`src/backtest.py`): bet the highest-EV outcome when
-   `p × odds − 1 > edge`; flat stakes or quarter Kelly (capped at 5% of the
-   bankroll, sized from the bankroll at the start of each match day).
-7. **Paper trading**: `predict` logs value bets on games that haven't kicked off
-   (each pairing once per season, at the first price seen); `settle` adds
-   results and closing odds, also for postponed games.
+7. **Backtest** (`src/backtest.py`): value bets at one bookmaker or the best
+   price, flat or quarter-Kelly stakes, like-for-like CLV, CLV against the
+   sharp close, a no-model control, per-season breakdown and bootstrap
+   intervals for ROI.
+8. **Paper trading**: `predict` logs value bets on games that haven't kicked
+   off (each pairing once per season, at the first price seen); `settle` adds
+   results, closing odds and CLV, also for postponed games.
 
 ## Usage
 
@@ -104,16 +165,15 @@ python -m venv .venv
 pip install -r requirements.txt
 
 python run.py download            # results, odds, Understat xG, upcoming fixtures
-python run.py evaluate            # walk-forward test of every model -> reports/
-python run.py predict             # upcoming games + value bets (default: Dixon-Coles)
+python run.py evaluate            # walk-forward test of every model -> reports/  (~1 min)
+python run.py predict             # value bets for upcoming games (market_plus, best price)
 python run.py settle              # results + CLV for logged paper trades
 streamlit run app.py              # dashboard
-pytest                            # tests
+pytest                            # 140 tests
 ```
 
-Useful options: `evaluate --models logistic dixon_coles`, `evaluate --model logistic`
-(model used for the backtest and charts), `predict --model lgbm --min-edge 0.08`,
-`download --no-xg`.
+Options: `predict --model ensemble --price book --min-edge 0.03 --max-edge 0.2`,
+`evaluate --models market market_plus dixon_coles`, `download --no-xg`.
 
 **Daily run.** `scripts/daily.ps1` (Windows) and `scripts/daily.sh` (macOS/Linux)
 run download → predict → settle and append to `reports/daily.log`. The
@@ -123,9 +183,11 @@ scheduling command is in each script's header.
 
 | File | Contents |
 |---|---|
-| `model_comparison.csv` | Every model vs the market, pooled over test seasons |
+| `model_comparison.csv` | Every model vs the closing line, pooled over test seasons |
 | `probability_metrics.csv` | Log loss and Brier per model per season |
-| `backtest_summary.csv` | Bets, hit rate, ROI, CLV, drawdown, flat and Kelly |
+| `backtest_summary.csv` | Every strategy: bets, ROI with 95% interval, CLV, drawdown |
+| `strategy_by_season.csv` | The main strategy season by season |
+| `control_clv.csv` | CLV of betting blindly, the bar to beat |
 | `calibration.csv` | Reliability-diagram data |
 | `predictions.csv` | Every out-of-sample prediction, every model |
 | `upcoming.csv` | Latest predictions for upcoming fixtures |
@@ -137,49 +199,48 @@ scheduling command is in each script's header.
 ```
 run.py              command-line entry point
 app.py              Streamlit dashboard
-src/data.py         download, cleaning, bookmaker selection, fair probabilities
+src/data.py         download, cleaning, bookmaker selection, best price, stats
 src/xg.py           Understat download, cache, team-name mapping, merge
-src/features.py     Elo, form, rolling xG (leakage-free single pass)
-src/model.py        model registry, walk-forward, metrics, calibration
+src/features.py     Elo, form, rolling shots and xG (leakage-free single pass)
+src/model.py        model registry, stacked inputs, walk-forward, metrics, calibration
 src/dixon_coles.py  Dixon-Coles model
-src/backtest.py     value bets, flat and Kelly staking, CLV, paper-trade settling
+src/backtest.py     value bets, staking, CLV, control, bootstrap, paper-trade settling
 src/plots.py        report charts
 scripts/            daily update scripts
-tests/              pytest suite (115 tests, synthetic league data, ~25 s)
+tests/              pytest suite on a synthetic league
 ```
 
 ## Testing
 
-`pytest` runs 115 tests on a synthetic league that copies the quirks of the
+`pytest` runs 140 tests on a synthetic league that copies the quirks of the
 real data: two- and four-digit years, a byte-order mark, Pinnacle odds stopping
-mid-season, relegated teams returning, a half-played season. They check, among
-other things, that no feature can see the match it describes or any later one,
-that Dixon-Coles gradients match numerical ones, that walk-forward never trains
-on the test season, that CLV only compares prices from the same bookmaker, and
-that paper trades are logged once and settled against the right game.
+mid-season, relegated teams returning, a half-played season. Among other
+things they check that:
 
-## Data notes and limitations
+- no feature, and no Dixon-Coles input, can see the match it describes or
+  any later one;
+- Dixon-Coles gradients match numerical ones;
+- walk-forward never trains on the test season;
+- CLV only compares like with like, and fair CLV uses the sharp close;
+- paper trades are logged once and settled against the right game.
 
-- Pinnacle odds stop in the football-data.co.uk files after 12 Jan 2026, so
-  later bets are priced at Bet365 (a softer bookmaker with a ~5–7% margin) and
-  the benchmark switches to Betfair Exchange closing odds.
-- Understat was unreachable during development (DNS failure), so the xG models
-  have not yet been evaluated on real data. The code is tested with simulated
-  Understat responses and switches on automatically once the data downloads.
-- The best model is chosen on the same test seasons it is reported on, a mild
-  optimistic bias. The ranking is close, and none of the models beats the market
-  either way.
-- 2026/27 is only 108 matches so far; its numbers are noisy.
+The suite was written by a separate testing agent that only reported bugs; a
+correcting agent then fixed the ten it found.
 
-## Ideas for further work
+## Limitations
 
-- Evaluate the xG models once Understat is back.
-- Blend the model with the opening market price: does it add *anything* the
-  opening line doesn't already know?
-- Line-up and injury information close to kickoff.
-- Other markets (over/under goals) from the Dixon-Coles score matrix.
+- Best prices are an optimistic upper bound (see above), and bookmakers limit
+  accounts that consistently beat the closing line.
+- The main model was chosen after seeing these test seasons. Its rules are
+  simple (four inputs, one logistic regression) and the control comparison
+  doesn't depend on that choice, but a truly fresh test is the paper trading
+  from November 2026 onward.
+- Since Pinnacle odds disappeared from the data, the market input is weaker,
+  and so is the signal.
+- xG models have not been evaluated on real data (Understat unreachable).
 
 ## Disclaimer
 
-Educational project. Bookmakers are hard to beat, and this model does not beat
-them. Paper-trade before ever risking money.
+Educational project. A positive CLV backtest is not a guarantee of profit.
+Paper-trade before ever risking money, and never bet more than you can afford
+to lose.

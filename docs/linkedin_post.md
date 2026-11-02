@@ -1,31 +1,30 @@
 # LinkedIn post (draft)
 
-I built a La Liga match predictor to answer one question: can a data science model beat the betting market?
+I built a La Liga match predictor to answer one question: can a data science model find mispriced odds?
 
-Short answer: not yet. Here is what I learned building it.
+The honest answer: it can't predict results better than the market, but it can spot prices the market later corrects. Here's what I learned.
 
 ⚽ The setup
-• 14 seasons of La Liga results and odds (5,400+ matches)
-• 3 models: logistic regression on Elo ratings and form, LightGBM, and a Dixon-Coles Poisson model with time decay
-• Walk-forward testing only: every season is predicted by a model trained on earlier seasons, never a random split
+• 14 seasons of La Liga results, odds and shots (5,400+ matches)
+• 9 models: Elo + form logistic regression, LightGBM, a Dixon-Coles Poisson model, a stacked ensemble, and market-aware models built on the opening odds
+• Walk-forward testing only: every season is predicted by models trained on earlier seasons
 
 📏 The benchmark
-Accuracy is the wrong metric here. A model that always picks the home team is right 45% of the time. What matters is whether my probabilities beat the bookmaker's, so I compared every model against the margin-free closing odds using log loss, and measured closing line value (CLV) on every bet.
+Accuracy is the wrong metric: always picking the home team is right 45% of the time. I judged every model by log loss against the sharp closing odds, and every bet by closing line value (CLV): did it get a better price than the market's final, best-informed opinion?
 
-📊 The results (1,628 test matches, 2022–2026)
-• Best model (Dixon-Coles): log loss 0.976
-• Bookmaker closing odds: 0.956
-• The model's "value bets" beat the closing price only 41% of the time, with flat-stake ROI around −17%
-• Quarter-Kelly staking turned a bankroll of 100 into about 4. Kelly amplifies your edge, including a negative one.
+📊 What I found (1,628 test matches, 2022–2026)
+• No model forecasts better than the closing line. My best football-only model (log loss 0.973) is well behind it (0.956).
+• The opening market is almost as good as the close. Adding my football features to it didn't help on average.
+• But combining a market-anchored model with line shopping picks bets that beat the closing line by +2.3% on average, 68% of the time. Random bets at the same prices: −0.8%.
+• Profit isn't proven: ROI is +0.3% with a 95% interval of −12% to +13%. That's why I'm paper trading next.
+• One model showed +10% profit in the backtest while losing 3.9% to the closing line. Profit without CLV is luck.
 
 🧠 What I learned
-1. Look at the data before modelling it. My first real-data run found a file encoding bug, a bookmaker (Pinnacle) disappearing from the data mid-season, and promoted teams returning after 8 years with stale ratings.
-2. Leakage is easy to create and hard to see. Every feature is computed in one chronological pass that only sees the past.
-3. Compare like with like. CLV is meaningless if your bet price and the closing price come from different bookmakers.
-4. A well-calibrated model can still be worse than the market. Calibration and edge are different things.
-5. Honest negative results are results. The gap to the market is now a number I can try to close.
-
-Next: adding expected goals (xG) features and testing whether the model adds anything to the opening market price.
+1. Look at the data before modelling. The first real-data run found an encoding bug, a bookmaker vanishing mid-season, and promoted teams returning with 8-year-old ratings.
+2. Leakage hides everywhere, including in stacked models: every model input is built only from earlier matches.
+3. Always compare with a control. "Positive CLV" means nothing until you know what random bets get.
+4. Confidence intervals keep you honest. A 600-bet backtest can't prove profit.
+5. I used AI agents as a separate tester and fixer: 140 tests, 10 real bugs found and fixed.
 
 Code, charts and method: [GitHub link]
 

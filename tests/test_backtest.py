@@ -97,7 +97,7 @@ def test_max_drawdown():
 
 def test_summary_empty_and_full():
     s = backtest.summary(pd.DataFrame(), 0.05)
-    assert s == {"staking": "flat", "min_edge": 0.05, "bets": 0}
+    assert s == {"price": "book", "staking": "flat", "min_edge": 0.05, "bets": 0}
     pred = _pred([
         ("2024-01-01", 0.6, 0.3, 0.1, 2.0, 3.0, 6.0, 1.8, 3.0, 5.0, "D"),
         ("2024-01-02", 0.5, 0.3, 0.2, 2.2, 3.0, 6.0, 2.0, 3.0, 6.5, "A"),

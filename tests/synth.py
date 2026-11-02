@@ -83,6 +83,9 @@ def raw_season(season: int, rng, played_rounds: int | None = None) -> pd.DataFra
         sch = sch[sch["round"] <= played_rounds]
     fmt = "%d/%m/%y" if season < 2019 else "%d/%m/%Y"   # 2- and 4-digit years like the real files
     rows = []
+    # separate generator for the newer columns, so the original draws
+    # (results, odds) stay exactly as they were
+    rng_extra = np.random.default_rng(10_000 + season)
     for g in sch.itertuples():
         lam, mu = rates(g.home, g.away)
         hg, ag = int(rng.poisson(lam)), int(rng.poisson(mu))
@@ -104,6 +107,16 @@ def raw_season(season: int, rng, played_rounds: int | None = None) -> pd.DataFra
             bfe = _odds(p, 0.005, rng, 0.005)
             for k, s in enumerate(OUT):
                 row[f"BFEC{s}"] = bfe[k]
+        # shots: on target = goals + some misses, total = on target + more
+        hst = hg + int(rng_extra.poisson(2.5 * lam))
+        ast = ag + int(rng_extra.poisson(2.5 * mu))
+        row.update({"HS": hst + int(rng_extra.poisson(7)), "AS": ast + int(rng_extra.poisson(6)),
+                    "HST": hst, "AST": ast})
+        # best price across bookmakers ("BbMx" before 2019/20, "Max" after)
+        best_prefix = "BbMx" if season < 2019 else "Max"
+        for s in OUT:
+            prices = [row[f"{b}{s}"] for b in books]
+            row[f"{best_prefix}{s}"] = round(max(prices) * 1.01, 2)
         rows.append(row)
     return pd.DataFrame(rows)
 

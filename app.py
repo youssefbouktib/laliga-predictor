@@ -51,20 +51,32 @@ with tab_up:
     if up is None or up.empty:
         st.info("No upcoming fixtures. Run `python run.py download` and `python run.py predict`.")
     else:
-        min_edge = st.slider("Minimum edge for a value bet", 0.0, 0.20, 0.05, 0.01, format="%.2f")
+        has_best = {"best_h", "best_d", "best_a"}.issubset(up.columns)
+        c = st.columns(3)
+        min_edge = c[0].slider("Minimum edge", 0.0, 0.20, 0.05, 0.01, format="%.2f")
+        max_edge = c[1].slider("Maximum edge (skip too-good-to-be-true)", 0.05, 1.0, 0.15, 0.01,
+                               format="%.2f")
+        price = c[2].radio("Price", ["best", "book"] if has_best else ["book"], horizontal=True,
+                           help="best = best price across all bookmakers (line shopping)")
+        prefix = "best" if price == "best" else "odds"
         rows = []
         for r in up.itertuples():
-            evs = {o: getattr(r, f"p_{o}") * getattr(r, f"odds_{o}") - 1 for o in "hda"}
-            best = max(evs, key=evs.get)
+            evs = {o: getattr(r, f"p_{o}") * getattr(r, f"{prefix}_{o}") - 1 for o in "hda"}
+            evs = {o: v for o, v in evs.items() if pd.notna(v)}
+            pick = max(evs, key=evs.get) if evs else None
+            ev = evs[pick] if pick else float("nan")
             rows.append({
                 "date": r.date.date(), "match": f"{r.home} v {r.away}",
                 "P(H)": r.p_h, "P(D)": r.p_d, "P(A)": r.p_a,
-                "odds H": r.odds_h, "odds D": r.odds_d, "odds A": r.odds_a,
-                "best EV": evs[best],
-                "value bet": {"h": "Home", "d": "Draw", "a": "Away"}[best] if evs[best] > min_edge else "",
+                "odds H": getattr(r, f"{prefix}_h"), "odds D": getattr(r, f"{prefix}_d"),
+                "odds A": getattr(r, f"{prefix}_a"),
+                "best EV": ev,
+                "value bet": ({"h": "Home", "d": "Draw", "a": "Away"}[pick]
+                              if pick and min_edge < ev <= max_edge else ""),
             })
         t = pd.DataFrame(rows)
-        st.caption(f"Model: {up.model.iloc[0]} · bookmaker: {up.book.iloc[0]}")
+        st.caption(f"Model: {up.model.iloc[0]} · prices: "
+                   + ("best available across bookmakers" if price == "best" else f"{up.book.iloc[0]}"))
         st.dataframe(
             t, hide_index=True, width="stretch",
             column_config={
@@ -97,9 +109,10 @@ with tab_paper:
         c[0].metric("Bets logged", len(pt))
         c[1].metric("Settled", len(done))
         c[2].metric("Profit (units)", f"{done.profit.sum():+.2f}" if len(done) else "–")
-        clv = done.clv.dropna()
-        c[3].metric("Avg CLV", pct(clv.mean()) if len(clv) else "–",
-                    help="Positive CLV over many bets is the best evidence of a real edge.")
+        clv = (done.clv_fair if "clv_fair" in done.columns else done.clv).dropna()
+        c[3].metric("Avg CLV vs sharp close", pct(clv.mean()) if len(clv) else "–",
+                    help="Bet odds x fair closing probability - 1. Positive over many bets "
+                         "is the best evidence of a real edge.")
         if len(done):
             st.line_chart(done.sort_values("date").set_index("date").profit.cumsum(),
                           y_label="cumulative profit (units)")
@@ -126,10 +139,21 @@ with tab_models:
 
 # ---------------------------------------------------------------- backtest
 with tab_bt:
+    by_season = read("strategy_by_season.csv")
+    control = read("control_clv.csv")
+    if (REPORTS / "clv_by_season.png").exists():
+        st.image(str(REPORTS / "clv_by_season.png"))
+    if by_season is not None:
+        st.dataframe(by_season, hide_index=True, width="stretch")
+    if control is not None:
+        st.caption("Control, no model (bet every outcome): average CLV vs sharp close "
+                   + ", ".join(f"{r.price} price {r.avg_clv_fair:+.2%}" for r in control.itertuples()))
     bt = read("backtest_summary.csv")
     if bt is not None:
+        st.subheader("All strategies")
         st.dataframe(bt, hide_index=True, width="stretch")
     if (REPORTS / "profit_curve.png").exists():
         st.image(str(REPORTS / "profit_curve.png"))
     st.caption("Flat stakes risk 1 unit per bet. Quarter Kelly stakes 25% of the Kelly fraction, "
-               "capped at 5% of the bankroll.")
+               "capped at 5% of the bankroll. roi_ci_low/high: 95% bootstrap interval; if it "
+               "contains 0, the profit or loss may be luck.")

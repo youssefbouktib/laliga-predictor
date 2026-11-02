@@ -107,3 +107,34 @@ def profit_curves(flat: dict, kelly: dict, model: str, path: pathlib.Path):
         ax.xaxis.set_major_locator(mdates.YearLocator())
         ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y"))
     _save(fig, path)
+
+
+def clv_by_season(by_season: pd.DataFrame, control: float | None, model: str, price: str,
+                  path: pathlib.Path):
+    """Average fair CLV of the strategy's bets per season, against the
+    no-model control (betting every outcome at the same prices)."""
+    fig, ax = plt.subplots(figsize=(8, 3.8))
+    if by_season.empty:
+        ax.text(0.5, 0.5, "no bets", ha="center", va="center", color=MUTED, transform=ax.transAxes)
+    else:
+        x = range(len(by_season))
+        vals = by_season.avg_clv_fair * 100
+        ax.bar(x, vals, width=0.55, color=C_MODEL, label=f"{model} value bets")
+        for xi, v, n in zip(x, vals, by_season.bets):
+            # labels always sit above the bar (or above zero for a negative bar)
+            # so they never collide with the control line below
+            ax.text(xi, max(v, 0) + 0.15, f"{v:+.1f}%\n{n} bets", ha="center",
+                    va="bottom", fontsize=8.5, color=MUTED)
+        ax.set_xticks(list(x), by_season.season)
+        lo = min(0, vals.min(), (control or 0) * 100) - 1.2
+        hi = max(0, vals.max(), (control or 0) * 100) + 1.4
+        ax.set_ylim(lo, hi)
+    ax.axhline(0, color=MUTED, lw=0.8)
+    if control is not None:
+        ax.axhline(control * 100, color=C_BOOKIE, lw=1.6, ls="--",
+                   label=f"no model, every outcome ({control:+.1%})")
+    ax.set_ylabel("average CLV vs sharp close (%)", color=MUTED, fontsize=9)
+    _style(ax, "Do the bets beat the closing line?",
+           f"{price} price, edge 5-15%. Above the dashed line = better than betting blindly")
+    ax.legend(frameon=False, fontsize=8.5, loc="upper center", bbox_to_anchor=(0.5, -0.1), ncol=2)
+    _save(fig, path)

@@ -44,7 +44,9 @@ def full_reports(tmp_path_factory):
         mp.setattr(run, "DOCS_IMG", base / "docs" / "img")
         mp.setattr(run, "today", lambda: pd.Timestamp("2000-01-01"))  # synthetic dates are past
         run.cmd_evaluate(argparse.Namespace(models=["logistic", "dixon_coles"], test_seasons=2, model=None))
-        run.cmd_predict(argparse.Namespace(model="dixon_coles", min_edge=0.05))
+        # book price, no edge cap: the synthetic odds are 15% generous on purpose
+        run.cmd_predict(argparse.Namespace(model="dixon_coles", min_edge=0.05, price="book",
+                                           max_edge=None))
         run.cmd_settle(argparse.Namespace())
     return base / "reports"
 

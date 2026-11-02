@@ -22,6 +22,18 @@ BOOK_PAIRS = [("PS", "PSC"), ("B365", "B365C"), ("Avg", "AvgC"), ("BbAv", None)]
 # 2024/25) replaces Pinnacle once it is gone.
 BENCH_CLOSE = ["PSC", "BFEC", "AvgC", "B365C"]
 
+# Sharp PRE-MATCH odds: the market's opinion when the odds were collected
+# (before kickoff, so usable as a model input without leakage).
+SHARP_OPEN = ["PS", "BFE", "Avg", "BbAv", "B365"]
+
+# Best price across all bookmakers (line shopping). "BbMx" before 2019/20.
+BEST_OPEN = ["Max", "BbMx"]
+
+# Match statistics -> our column names. Used only as *past* information
+# (rolling averages), never for the match they describe.
+STATS = {"HS": "h_shots", "AS": "a_shots", "HST": "h_sot", "AST": "a_sot",
+         "HC": "h_corners", "AC": "a_corners"}
+
 
 def season_code(start_year: int) -> str:
     return f"{start_year % 100:02d}{(start_year + 1) % 100:02d}"
@@ -97,13 +109,21 @@ def clean(df: pd.DataFrame, season: int | None) -> pd.DataFrame:
     if "FTHG" in df.columns:
         out["hg"] = pd.to_numeric(df["FTHG"], errors="coerce")
         out["ag"] = pd.to_numeric(df["FTAG"], errors="coerce")
+    for src, col in STATS.items():
+        out[col] = pd.to_numeric(df[src], errors="coerce") if src in df.columns else np.nan
     o, c, book = _paired_odds(df)
     bench = _odds(df, BENCH_CLOSE)
+    sharp = _odds(df, SHARP_OPEN)
+    best = _odds(df, BEST_OPEN)
+    # a "best" price below the bookmaker's own price means a broken feed row
+    best = np.where(np.isnan(best) | (best < o), o, best)
     out["book"] = book
     for i, s in enumerate("hda"):
         out[f"odds_{s}"] = o[:, i]
         out[f"close_{s}"] = c[:, i]
         out[f"bench_{s}"] = bench[:, i]
+        out[f"sharp_{s}"] = sharp[:, i]
+        out[f"best_{s}"] = best[:, i]
     return out.reset_index(drop=True)
 
 

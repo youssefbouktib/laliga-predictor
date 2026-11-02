@@ -56,14 +56,16 @@ def test_predict_hda_column_order():
 
 def test_available_models_and_has_xg(featured):
     df, _ = featured
-    assert model.available_models(df) == ["logistic", "lgbm", "dixon_coles"]
+    # build_features alone: Elo/form + shots, but no market or Dixon-Coles inputs yet
+    assert model.available_models(df) == ["logistic", "logistic_shots", "lgbm", "lgbm_shots",
+                                          "dixon_coles"]
     d2 = df.assign(hxg=np.nan, axg=np.nan)
     assert not model.has_xg(d2)
     assert "logistic_xg" not in model.available_models(d2)
     d3 = d2.copy()
     d3.loc[d3.season >= 2019, ["hxg", "axg"]] = 1.2
     assert model.has_xg(d3)
-    assert set(model.available_models(d3)) == set(model.ALL_MODELS)
+    assert {"logistic_xg", "lgbm_xg"} <= set(model.available_models(d3))
 
 
 def test_train_rows_for_xg_models(featured):
@@ -111,7 +113,8 @@ def test_compare_sorted_with_gap():
     comp = model.compare({"bad": bad, "good": good})
     assert comp.model.tolist() == ["good", "bad"]
     assert list(comp.columns) == ["model", "matches", "logloss", "brier", "bookie_logloss",
-                                  "bookie_brier", "gap_logloss"]
+                                  "bookie_brier", "gap_logloss", "uses_market"]
+    assert not comp.uses_market.any()
     assert comp.loc[1, "logloss"] == pytest.approx(np.log(3))
     np.testing.assert_allclose(comp.gap_logloss, comp.logloss - comp.bookie_logloss)
 
