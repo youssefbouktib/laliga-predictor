@@ -11,6 +11,7 @@ from __future__ import annotations
 import datetime as dt
 import html
 import pathlib
+import urllib.parse
 
 import altair as alt
 import pandas as pd
@@ -28,6 +29,34 @@ ACCENT, ACCENT_SOFT = "#1d6b4c", "#e1efe7"
 GOOD, BAD, WARN_SOFT = "#1d7a3e", "#b3352f", "#fbf0dc"
 C_MODEL, C_BOOKIE = "#2a78d6", "#eb6834"                      # model vs market, everywhere
 C_HOME, C_DRAW, C_AWAY = "#2a78d6", "#a7aca3", "#6250d6"     # home / neutral draw / away
+GOLD, RED = "#f1bf00", "#c8102e"                              # Spanish accents
+
+# club kit colours for the monogram badges: (code, fill, ring, text)
+TEAMS = {
+    "Alaves": ("ALA", "#0761af", "#ffffff", "#ffffff"), "Almeria": ("ALM", "#ee1119", "#ffffff", "#ffffff"),
+    "Ath Bilbao": ("ATH", "#ee2523", "#ffffff", "#ffffff"), "Ath Madrid": ("ATM", "#cb3524", "#272e61", "#ffffff"),
+    "Barcelona": ("BAR", "#a50044", "#004d98", "#ffffff"), "Betis": ("BET", "#0bb363", "#ffffff", "#ffffff"),
+    "Cadiz": ("CAD", "#f4d000", "#0045a7", "#0045a7"), "Celta": ("CEL", "#8ac3ee", "#e5254e", "#0b2a4a"),
+    "Elche": ("ELC", "#05642c", "#ffffff", "#ffffff"), "Espanol": ("ESP", "#007fc8", "#ffffff", "#ffffff"),
+    "Getafe": ("GET", "#005999", "#ffffff", "#ffffff"), "Girona": ("GIR", "#cd2534", "#ffffff", "#ffffff"),
+    "Granada": ("GRA", "#c31632", "#ffffff", "#ffffff"), "La Coruna": ("DEP", "#0067b1", "#ffffff", "#ffffff"),
+    "Las Palmas": ("LPA", "#ffe400", "#0049a1", "#0049a1"), "Leganes": ("LEG", "#0b4ea2", "#ffffff", "#ffffff"),
+    "Levante": ("LEV", "#b4053f", "#004a9f", "#ffffff"), "Malaga": ("MAL", "#6bb6e8", "#ffffff", "#0b2a4a"),
+    "Mallorca": ("MLL", "#e20613", "#111111", "#ffffff"), "Osasuna": ("OSA", "#d91a21", "#0a346f", "#ffffff"),
+    "Oviedo": ("OVI", "#0047ab", "#ffffff", "#ffffff"), "Real Madrid": ("RMA", "#ffffff", "#febe10", "#00529f"),
+    "Santander": ("RAC", "#00843d", "#ffffff", "#ffffff"), "Sevilla": ("SEV", "#ffffff", "#d4021d", "#d4021d"),
+    "Sociedad": ("RSO", "#0067b1", "#ffffff", "#ffffff"), "Valencia": ("VAL", "#ffffff", "#ee3524", "#111111"),
+    "Valladolid": ("VLL", "#921b88", "#ffffff", "#ffffff"), "Vallecano": ("RAY", "#ffffff", "#e53027", "#e53027"),
+    "Villarreal": ("VIL", "#ffe667", "#005187", "#005187"),
+}
+
+PITCH_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 440" fill="none" stroke="#ffffff" stroke-opacity=".22" stroke-width="3">
+<rect x="10" y="10" width="660" height="420" rx="4"/><line x1="340" y1="10" x2="340" y2="430"/>
+<circle cx="340" cy="220" r="62"/><circle cx="340" cy="220" r="4" fill="#ffffff" fill-opacity=".22"/>
+<rect x="10" y="110" width="104" height="220"/><rect x="10" y="168" width="36" height="104"/>
+<rect x="566" y="110" width="104" height="220"/><rect x="634" y="168" width="36" height="104"/>
+<path d="M114 180 A50 50 0 0 1 114 260"/><path d="M566 180 A50 50 0 0 0 566 260"/></svg>"""
+PITCH_BG = 'url("data:image/svg+xml,' + urllib.parse.quote(PITCH_SVG.replace("\n", "")) + '")'
 
 st.set_page_config(page_title="La Liga Predictor", page_icon="⚽", layout="wide")
 
@@ -87,8 +116,76 @@ button[data-baseweb="tab"] p { font-size: 15px; font-weight: 500; }
 .lp-step .n { font-family: "IBM Plex Mono", monospace; color: #1d6b4c; font-size: 13px; }
 .lp-step h4 { font-family: "Bricolage Grotesque", sans-serif; margin: 4px 0 6px; font-size: 17px; color: #15201a; }
 .lp-step p { margin: 0; font-size: 14px; color: #4a554e; line-height: 1.5; }
+
+/* ---------- football layer ---------- */
+[data-testid="stAppViewContainer"] {
+  background: repeating-linear-gradient(90deg, #f6f7f4 0 140px, #f1f3ee 140px 280px); }
+.lp-hero { position: relative; overflow: hidden; border-radius: 18px; padding: 34px 36px 26px;
+  background: PITCH_BG right -30px center / auto 118% no-repeat,
+              repeating-linear-gradient(90deg, #17603f 0 72px, #1b6b47 72px 144px); color: #fff; }
+.lp-hero::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 6px;
+  background: linear-gradient(90deg, #c8102e 0 33%, #f1bf00 33% 67%, #c8102e 67%); }
+.lp-hero .lp-eyebrow { color: #f1bf00; }
+.lp-hero .lp-title { color: #fff; font-size: 52px; }
+.lp-hero .lp-lede { color: #dcebe2; position: relative; }
+.lp-hero .lp-chip { background: rgba(255,255,255,.13); color: #e9f3ed; }
+.lp-ticker { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 20px; position: relative; }
+.lp-ball { display: inline-block; animation: lp-spin 6s linear infinite; }
+@keyframes lp-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .lp-ball { animation: none; } }
+
+.lp-badge { display: inline-flex; align-items: center; justify-content: center; border-radius: 50%;
+  font-family: "Bricolage Grotesque", sans-serif; font-weight: 700; letter-spacing: .02em;
+  flex: none; box-shadow: 0 1px 2px rgba(0,0,0,.18); }
+.lp-badge.sm { width: 34px; height: 34px; font-size: 10.5px; border: 2px solid; }
+.lp-badge.lg { width: 56px; height: 56px; font-size: 15px; border: 3px solid; }
+
+.lp-kpi { border-top: 4px solid #c8102e; }
+.lp-kpi.hero { background: #f1bf00; border-color: #f1bf00; border-top-color: #c8102e; }
+.lp-kpi.hero .k { color: #5a4600; } .lp-kpi.hero .v { color: #15201a; } .lp-kpi.hero .s { color: #3d3000; }
+
+[role="tablist"] { gap: 8px; flex-wrap: wrap; border: none !important; box-shadow: none !important; }
+[role="tablist"] > :not([data-testid="stTab"]) { display: none; }
+[data-testid="stTab"] { background: #fff; border: 1px solid #d9ddd5 !important; border-radius: 99px;
+  padding: 6px 16px !important; margin: 0 !important; }
+[data-testid="stTab"][aria-selected="true"] { background: #15201a; border-color: #15201a !important; }
+[data-testid="stTab"][aria-selected="true"] p { color: #fff !important; }
+.lp-card { padding: 0; gap: 0; overflow: hidden; }
+.lp-card.value { box-shadow: 0 6px 18px rgba(29,107,76,.14); border-color: #1d6b4c; }
+.lp-mtop { display: flex; justify-content: space-between; align-items: center; padding: 9px 16px;
+  background: #15201a; color: #cfd8d2; font-family: "IBM Plex Mono", monospace; font-size: 12px; }
+.lp-mtop .tag { background: #f1bf00; color: #15201a; font-weight: 600; border-radius: 4px; padding: 1px 7px; }
+.lp-mbody { padding: 16px 18px 16px; display: flex; flex-direction: column; gap: 14px; }
+.lp-match { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; }
+.lp-match .side { display: flex; flex-direction: column; align-items: center; gap: 7px; text-align: center; }
+.lp-match .nm { font-family: "Bricolage Grotesque", sans-serif; font-weight: 700; font-size: 16px; color: #15201a; }
+.lp-match .vs { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: #6f7a72;
+  border: 1px solid #d9ddd5; border-radius: 99px; padding: 3px 9px; }
+.lp-odds { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.lp-odd { border: 1px solid #d9ddd5; border-radius: 10px; padding: 7px 8px; text-align: center; background: #fafbf8; }
+.lp-odd .l { font-family: "IBM Plex Mono", monospace; font-size: 11.5px; color: #6f7a72; }
+.lp-odd .p { font-family: "Bricolage Grotesque", sans-serif; font-weight: 700; font-size: 20px; color: #15201a; }
+.lp-odd .o { font-family: "IBM Plex Mono", monospace; font-size: 12.5px; color: #4a554e; }
+.lp-odd.pick { border: 2px solid #f1bf00; background: #fffaea; }
+.lp-pill.yes { background: #1d6b4c; color: #fff; }
+
+.lp-table { width: 100%; border-collapse: separate; border-spacing: 0 5px; font-size: 14.5px; }
+.lp-table th { text-align: left; font-weight: 500; font-size: 12px; color: #6f7a72; text-transform: uppercase;
+  letter-spacing: .06em; padding: 0 12px; }
+.lp-table td { background: #fff; padding: 10px 12px; border-top: 1px solid #e2e5de; border-bottom: 1px solid #e2e5de; }
+.lp-table td:first-child { border-left: 5px solid #d9ddd5; border-radius: 8px 0 0 8px;
+  font-family: "IBM Plex Mono", monospace; color: #4a554e; width: 52px; }
+.lp-table td:last-child { border-right: 1px solid #e2e5de; border-radius: 0 8px 8px 0; }
+.lp-table td.num { font-family: "IBM Plex Mono", monospace; text-align: right; }
+.lp-table tr.champ td { background: #fffaea; } .lp-table tr.champ td:first-child { border-left-color: #f1bf00; }
+.lp-table tr.europe td:first-child { border-left-color: #1d6b4c; }
+.lp-table tr.releg td:first-child { border-left-color: #c8102e; }
+.lp-zones { display: flex; gap: 18px; flex-wrap: wrap; font-size: 13px; color: #4a554e; margin: 4px 0 18px; }
+.lp-zones i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.lp-step .n { display: inline-flex; width: 34px; height: 34px; border-radius: 50%; background: #15201a;
+  color: #f1bf00; align-items: center; justify-content: center; font-weight: 500; }
 </style>
-""")
+""".replace("PITCH_BG", PITCH_BG))
 
 
 # ---------------------------------------------------------------- data helpers
@@ -123,6 +220,16 @@ def style(chart: alt.Chart, height: int = 300) -> alt.Chart:
                               title=None, symbolStrokeWidth=0))
 
 
+def badge(team: str, size: str = "sm") -> str:
+    """Monogram badge in club colours (no real crests)."""
+    code, fill, ring, text = TEAMS.get(team, (str(team)[:3].upper(), "#4a554e", "#ffffff", "#ffffff"))
+    return (f'<span class="lp-badge {size}" title="{esc(team)}" '
+            f'style="background:{fill};border-color:{ring};color:{text}">{esc(code)}</span>')
+
+
+
+
+
 def chart_title(title: str, sub: str | None = None):
     st.markdown(f"#### {title}")
     if sub:
@@ -155,13 +262,21 @@ if bt is not None and "price" in bt.columns:
 
 # ---------------------------------------------------------------- header
 updated = dt.datetime.fromtimestamp((REPORTS / "model_comparison.csv").stat().st_mtime)
+preds = read("predictions.csv", usecols=["season", "home"])
+season_now, teams_now = "", []
+if preds is not None and len(preds):
+    last = preds.season.iloc[-1]
+    teams_now = sorted(preds.loc[preds.season == last, "home"].unique())
+    season_now = f"{int(last)}/{(int(last) + 1) % 100:02d}" if str(last).isdigit() else str(last)
 st.html(f"""
-<div class="lp-eyebrow">La Liga · value detection · walk-forward tested</div>
+<div class="lp-hero">
+<div class="lp-eyebrow"><span class="lp-ball">⚽</span> Primera División{' · ' + esc(season_now) if season_now else ''} · value detection</div>
 <div class="lp-title">La Liga Predictor</div>
-<p class="lp-lede">Nine models forecast every match, then the system looks for prices the market
+<p class="lp-lede">Nine models forecast every match, then the system hunts for prices the market
 will later correct. Judged against the sharp closing line, not by accuracy or lucky profit.</p>
 <span class="lp-chip">reports updated {updated:%d %b %Y, %H:%M} · main model {esc(main_model)} · {esc(main_price)} price</span>
-""")
+<div class="lp-ticker">{''.join(badge(t) for t in teams_now)}</div>
+</div>""")
 
 if main_row is not None:
     clv = main_row.get("avg_clv_fair")
@@ -180,7 +295,7 @@ if main_row is not None:
 </div>""")
 
 tab_week, tab_edge, tab_models, tab_paper, tab_how = st.tabs(
-    ["This week", "The edge", "Models", "Paper trades", "How it works"])
+    ["⚽ This week", "📈 The edge", "🏆 Model table", "📝 Paper trades", "📖 How it works"])
 
 # ---------------------------------------------------------------- this week
 with tab_week:
@@ -207,21 +322,28 @@ with tab_week:
             is_value = pick is not None and min_edge < ev <= max_edge
             bar = "".join(f'<i style="width:{probs[o] * 100:.1f}%;background:{col}"></i>'
                           for o, col in zip("hda", (C_HOME, C_DRAW, C_AWAY)))
+            sym = {"h": "1 · home", "d": "X · draw", "a": "2 · away"}
             cells = "".join(
-                f'<div><span class="dot" style="background:{col}"></span>{names[o]}'
-                f'<b>{probs[o]:.0%}</b>@ {odds[o]:.2f}</div>' if pd.notna(odds[o]) else
-                f'<div><span class="dot" style="background:{col}"></span>{names[o]}<b>{probs[o]:.0%}</b>no price</div>'
-                for o, col in zip("hda", (C_HOME, C_DRAW, C_AWAY)))
-            pill = (f'<span class="lp-pill yes">Value: {names[pick]} @ {odds[pick]:.2f} · EV {ev:+.1%}</span>'
+                f'<div class="lp-odd{" pick" if is_value and o == pick else ""}">'
+                f'<div class="l">{sym[o]}</div><div class="p">{probs[o]:.0%}</div>'
+                f'<div class="o">{f"@ {odds[o]:.2f}" if pd.notna(odds[o]) else "no price"}</div></div>'
+                for o in "hda")
+            pill = (f'<span class="lp-pill yes">Value bet: {names[pick]} @ {odds[pick]:.2f} · EV {ev:+.1%}</span>'
                     if is_value else
                     f'<span class="lp-pill no">No value · best EV {ev:+.1%}</span>' if pick else
                     '<span class="lp-pill no">No prices yet</span>')
             cards.append(f"""<div class="lp-card{' value' if is_value else ''}">
-  <div class="when">{r.date:%a %d %b %Y}</div>
-  <div class="teams">{esc(r.home)}<span>v</span>{esc(r.away)}</div>
+  <div class="lp-mtop"><span>MATCHDAY · {r.date:%a %d %b %Y}</span>{'<span class="tag">VALUE</span>' if is_value else ''}</div>
+  <div class="lp-mbody">
+  <div class="lp-match">
+    <div class="side">{badge(r.home, "lg")}<div class="nm">{esc(r.home)}</div></div>
+    <div class="vs">VS</div>
+    <div class="side">{badge(r.away, "lg")}<div class="nm">{esc(r.away)}</div></div>
+  </div>
   <div class="lp-bar" role="img" aria-label="home {probs['h']:.0%}, draw {probs['d']:.0%}, away {probs['a']:.0%}">{bar}</div>
-  <div class="lp-probs">{cells}</div>
+  <div class="lp-odds">{cells}</div>
   {pill}
+  </div>
 </div>""")
             rows.append({"date": r.date.date(), "match": f"{r.home} v {r.away}",
                          "P(H)": probs["h"], "P(D)": probs["d"], "P(A)": probs["a"],
@@ -307,6 +429,24 @@ with tab_models:
     c[1].metric("Its log loss", f"{best.logloss:.4f}")
     c[2].metric("Gap to bookmaker", f"{best.gap_logloss:+.4f}",
                 help="Model log loss minus the sharp closing line's. Above zero = the market is better.")
+
+    chart_title("The standings", "Every model ranked by log loss over all test matches, like a league table. "
+                "Lower is better, and the sharp closing line sits top.")
+    table = [("🏆", "Sharp closing line", "the market's final price", float(comp.bookie_logloss.iloc[0]), None, "champ")]
+    ranked = comp.sort_values("logloss").reset_index(drop=True)
+    for i, r in ranked.iterrows():
+        market = bool(r.get("uses_market", False))
+        zone = "releg" if i >= len(ranked) - 3 and len(ranked) > 4 else "europe" if market else ""
+        table.append((f"{i + 2}", r.model, ("opening odds only" if r.model == "market" else "opening odds + football") if market else "football data only",
+                      float(r.logloss), float(r.gap_logloss), zone))
+    st.html('<table class="lp-table"><tr><th>Pos</th><th>Model</th><th>Inputs</th>'
+            '<th style="text-align:right">Log loss</th><th style="text-align:right">Gap</th></tr>'
+            + "".join(f'<tr class="{z}"><td>{p}</td><td><b>{esc(m)}</b></td><td>{esc(k)}</td>'
+                      f'<td class="num">{ll:.4f}</td><td class="num">{"–" if g is None else f"{g:+.4f}"}</td></tr>'
+                      for p, m, k, ll, g, z in table) + "</table>"
+            f'<div class="lp-zones"><span><i style="background:{GOLD}"></i>Champion: the benchmark</span>'
+            f'<span><i style="background:{ACCENT}"></i>Market-aware models</span>'
+            f'<span><i style="background:{RED}"></i>Relegation zone</span></div>')
 
     chart_title("Every model vs the closing line",
                 "Log loss over all test matches, lower is better · the line shows each model's gap to the market")
@@ -426,7 +566,7 @@ with tab_how:
                     "bootstrap range for ROI. Profit alone can be luck."),
     ]
     st.html('<div class="lp-steps">' + "".join(
-        f'<div class="lp-step"><div class="n">{i:02d}</div><h4>{esc(t)}</h4><p>{esc(b)}</p></div>'
+        f'<div class="lp-step"><div class="n">{i}</div><h4>{esc(t)}</h4><p>{esc(b)}</p></div>'
         for i, (t, b) in enumerate(steps, 1)) + "</div>")
     st.html('<div class="lp-note" style="margin-top:14px">Educational project, paper trading only. '
             'A positive backtest is not a guarantee of profit, and bookmakers limit accounts that '
