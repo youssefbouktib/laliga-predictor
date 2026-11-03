@@ -1,31 +1,35 @@
-# LinkedIn post (draft)
+# LinkedIn post
 
-I built a La Liga match predictor to answer one question: can a data science model find mispriced odds?
+Attach: docs/img/dashboard.png, docs/img/clv_by_season.png
 
-The honest answer: it can't predict results better than the market, but it can spot prices the market later corrects. Here's what I learned.
+---
 
-⚽ The setup
-• 14 seasons of La Liga results, odds and shots (5,400+ matches)
-• 9 models: Elo + form logistic regression, LightGBM, a Dixon-Coles Poisson model, a stacked ensemble, and market-aware models built on the opening odds
-• Walk-forward testing only: every season is predicted by models trained on earlier seasons
+Can a data science model beat the betting market? I built a La Liga predictor to find out ⚽
 
-📏 The benchmark
-Accuracy is the wrong metric: always picking the home team is right 45% of the time. I judged every model by log loss against the sharp closing odds, and every bet by closing line value (CLV): did it get a better price than the market's final, best-informed opinion?
+Short answer: it can't predict results better than the market, but it can spot prices the market later corrects.
 
-📊 What I found (1,628 test matches, 2022–2026)
-• No model forecasts better than the closing line. My best football-only model (log loss 0.973) is well behind it (0.956).
-• The opening market is almost as good as the close. Adding my football features to it didn't help on average.
-• But combining a market-anchored model with line shopping picks bets that beat the closing line by +2.3% on average, 68% of the time. Random bets at the same prices: −0.8%.
-• Profit isn't proven: ROI is +0.3% with a 95% interval of −12% to +13%. That's why I'm paper trading next.
-• One model showed +10% profit in the backtest while losing 3.9% to the closing line. Profit without CLV is luck.
+🔧 What I built
+• 14 seasons of La Liga data: results, shots and odds (5,400+ matches)
+• 9 models: Elo + form logistic regression, LightGBM, a Dixon-Coles goals model, a stacked ensemble, and models built on the opening odds
+• Walk-forward testing: every season is predicted only by models trained on earlier seasons, never a random split
+• A Streamlit dashboard that shows this week's value bets and logs paper trades
+
+📏 How I judged it
+Accuracy is the wrong metric: always picking the home team is right 45% of the time. I scored every model by log loss against the bookmakers' closing odds, the most accurate estimate there is. I judged every bet by closing line value (CLV): did it get a better price than the market's final one?
+
+📊 Results (1,628 test matches, 2022–2026)
+• No model forecasts better than the closing odds. The market is very good.
+• But the bets my best model picks beat the closing price by +2.3% on average, 68% of the time. Random bets at the same prices: −0.8%.
+• Profit isn't proven yet: ROI +0.3%, with a 95% interval of −12% to +13%. So I'm paper trading next.
+• One model made +10% profit in the backtest while losing 3.9% to the closing odds. Profit without CLV is luck.
 
 🧠 What I learned
-1. Look at the data before modelling. The first real-data run found an encoding bug, a bookmaker vanishing mid-season, and promoted teams returning with 8-year-old ratings.
-2. Leakage hides everywhere, including in stacked models: every model input is built only from earlier matches.
-3. Always compare with a control. "Positive CLV" means nothing until you know what random bets get.
-4. Confidence intervals keep you honest. A 600-bet backtest can't prove profit.
-5. I used AI agents as a separate tester and fixer: 140 tests, 10 real bugs found and fixed.
+1. Look at the data before modelling: I found an encoding bug, a bookmaker vanishing mid-season, and promoted teams returning with 8-year-old ratings.
+2. Leakage hides everywhere, even in stacked models. Every input is built only from earlier matches, and tests check it.
+3. Always compare against a control. "Positive" means nothing until you know what random gets.
+4. Simple beat complex: logistic regression beat LightGBM on this small, noisy data.
+5. Confidence intervals keep you honest.
 
-Code, charts and method: [GitHub link]
+Code and method: [GitHub link]
 
 #DataScience #MachineLearning #Python #SportsAnalytics #Football #LaLiga
