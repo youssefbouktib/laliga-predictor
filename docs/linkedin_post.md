@@ -30,6 +30,6 @@ Accuracy is the wrong metric: always picking the home team is right 45% of the t
 4. Simple beat complex: logistic regression beat LightGBM on this small, noisy data.
 5. Confidence intervals keep you honest.
 
-Code and method: [GitHub link]
+Code and method: https://github.com/youssefbouktib/laliga-predictor
 
 #DataScience #MachineLearning #Python #SportsAnalytics #Football #LaLiga
