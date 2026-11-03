@@ -2,6 +2,8 @@
 
 Can a data science model find mispriced odds in Spanish football?
 
+![Dashboard](docs/img/dashboard.png)
+
 This project forecasts La Liga results (home / draw / away) with nine models,
 tests them the way they would really be used (walk-forward, never peeking at
 the future), and measures them against the **sharp closing odds**, the hardest
